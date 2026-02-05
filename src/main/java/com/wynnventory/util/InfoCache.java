@@ -23,7 +23,11 @@ public class InfoCache {
     public static final Map<String, PriceEntry> priceCache = new HashMap<>();
     private static final Path cacheFile = Paths.get("wynnventory_price_cache.json");
     public static final long FIVE_DAYS_MS = 5L * 24 * 60 * 60 * 1000;
+    public static final long TWO_DAYS_MS = 2L * 24 * 60 * 60 * 1000;
     public static final long FIVE_MINS_MS = 300000;
+    public static final long ONE_MINS_MS = 60000;
+    public static final long FETCH_INTERVAL = TWO_DAYS_MS;
+    public static final long SAVE_INTERVAL = FIVE_MINS_MS;
     private static long lastSaveTime = 0;
 
     private static final Set<String> pendingFetches =
@@ -83,12 +87,12 @@ public class InfoCache {
         long now = System.currentTimeMillis();
         PriceEntry entry = priceCache.get(key);
 
-        // Fresh cached value → return immediately
-        if (entry != null && now - entry.lastFetchTime <= FIVE_MINS_MS) {
+        // Fresh cached value - return immediately
+        if (entry != null && now - entry.lastFetchTime <= FETCH_INTERVAL) {
             return entry.price;
         }
 
-        // Already fetching → return what we have (or null)
+        // Already fetching - return what we have (or null)
         if (pendingFetches.contains(key)) {
             return entry != null ? entry.price : null;
         }
@@ -113,7 +117,7 @@ public class InfoCache {
 
     private static synchronized void maybeSave() {
         long now = System.currentTimeMillis();
-        if (now - lastSaveTime >= FIVE_MINS_MS) {
+        if (now - lastSaveTime >= SAVE_INTERVAL) {
             lastSaveTime = now;
             saveCache();
 
@@ -121,6 +125,10 @@ public class InfoCache {
                 System.out.println("Auto-saved price cache.");
             }
         }
+    }
+
+    public static boolean isFetching(String key) {
+        return pendingFetches.contains(key);
     }
 
 }

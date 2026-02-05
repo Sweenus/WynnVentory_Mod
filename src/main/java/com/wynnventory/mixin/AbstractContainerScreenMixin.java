@@ -4,6 +4,7 @@ import com.wynntils.core.components.Models;
 import com.wynntils.models.gear.type.GearInfo;
 import com.wynntils.models.items.WynnItem;
 import com.wynntils.models.items.items.game.GearBoxItem;
+import com.wynntils.models.items.items.game.GearItem;
 import com.wynntils.utils.render.FontRenderer;
 
 import com.wynnventory.model.item.trademarket.TradeMarketItemPriceInfo;
@@ -30,6 +31,7 @@ public abstract class AbstractContainerScreenMixin {
     private static final double priceStx = 262_144;
     private static final double priceLiquidEmerald = 4_096;
     private static final double priceEmeraldBlock = 64;
+    private static final double priceMinimumThreshold = priceLiquidEmerald * 2;
 
 
     private Double getItemPrice(ItemStack stack) {
@@ -73,6 +75,38 @@ public abstract class AbstractContainerScreenMixin {
         ItemStack stack = slot.getItem();
         if (stack.isEmpty()) return;
 
+        Optional<WynnItem> maybeItem = Models.Item.getWynnItem(stack);
+        if (maybeItem.isEmpty()) return;
+
+        WynnItem item = maybeItem.get();
+
+        if (item instanceof GearItem || item instanceof GearBoxItem) {
+            // Check cache key
+            String cacheKey;
+            if (item instanceof GearBoxItem gearBoxItem) {
+                cacheKey = "GEARBOX:" + gearBoxItem.hashCode();
+            } else {
+                cacheKey = ItemStackUtils.getWynntilsOriginalNameAsString(item);
+            }
+
+            // Loading radial
+            if (InfoCache.isFetching(cacheKey)) {
+                long now = System.currentTimeMillis();
+                float progress = (now % 1200L) / 1200f;
+
+                drawRadialCooldown(
+                        guiGraphics,
+                        slot.x,
+                        slot.y,
+                        16,
+                        progress,
+                        0x88D0D0D0
+                );
+                return;
+            }
+        }
+
+        // Price check
         Double price = getItemPrice(stack);
         if (price == null || price <= priceLiquidEmerald) return;
 
@@ -81,21 +115,21 @@ public abstract class AbstractContainerScreenMixin {
         int squareSize = 16;
         int squareX = slot.x;
         int squareY = slot.y;
+
         int valueColorGreen  = 0xFF00FF00;
         int valueColorOrange = 0xFFFF8000;
         int valueColorRed    = 0xFFFF4000;
 
         int fillColor = 0;
-
         if (price >= priceStx) {
             fillColor = valueColorRed;
         } else if (price >= priceLiquidEmerald * 10) {
             fillColor = valueColorOrange;
-        } else if (price >= priceLiquidEmerald * 2) {
+        } else if (price >= priceMinimumThreshold) {
             fillColor = valueColorGreen;
         }
 
-        if (price >= priceLiquidEmerald * 2) {
+        if (price >= priceMinimumThreshold) {
             guiGraphics.fill(
                     squareX,
                     squareY,
@@ -103,17 +137,17 @@ public abstract class AbstractContainerScreenMixin {
                     squareY + squareSize,
                     fillColor
             );
-        }
 
-        if (Screen.hasControlDown()) {
-            guiGraphics.drawString(
-                    FontRenderer.getInstance().getFont(),
-                    text,
-                    slot.x + 18,
-                    slot.y + 16 - 7,
-                    fillColor,
-                    true
-            );
+            if (Screen.hasControlDown()) {
+                guiGraphics.drawString(
+                        FontRenderer.getInstance().getFont(),
+                        text,
+                        slot.x + 18,
+                        slot.y + 16 - 7,
+                        fillColor,
+                        true
+                );
+            }
         }
     }
 
@@ -160,4 +194,45 @@ public abstract class AbstractContainerScreenMixin {
         }
         return 0;
     }
+
+    private void drawRadialCooldown(
+            GuiGraphics g,
+            int x,
+            int y,
+            int size,
+            float progress,
+            int color
+    ) {
+        int cx = x + size / 2;
+        int cy = y + size / 2;
+
+        // Top quadrant (0–25%)
+        if (progress > 0f) {
+            float p = Math.min(progress, 0.25f) / 0.25f;
+            int h = (int)(size / 2 * p);
+            g.fill(cx, cy - h, cx + size / 2, cy, color);
+        }
+
+        // Right quadrant (25–50%)
+        if (progress > 0.25f) {
+            float p = Math.min(progress - 0.25f, 0.25f) / 0.25f;
+            int w = (int)(size / 2 * p);
+            g.fill(cx, cy, cx + w, cy + size / 2, color);
+        }
+
+        // Bottom quadrant (50–75%)
+        if (progress > 0.50f) {
+            float p = Math.min(progress - 0.50f, 0.25f) / 0.25f;
+            int h = (int)(size / 2 * p);
+            g.fill(cx - size / 2, cy, cx, cy + h, color);
+        }
+
+        // Left quadrant (75–100%)
+        if (progress > 0.75f) {
+            float p = Math.min(progress - 0.75f, 0.25f) / 0.25f;
+            int w = (int)(size / 2 * p);
+            g.fill(cx - w, cy - size / 2, cx, cy, color);
+        }
+    }
+
 }
