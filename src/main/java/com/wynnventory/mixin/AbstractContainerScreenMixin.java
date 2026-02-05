@@ -5,9 +5,9 @@ import com.wynntils.models.gear.type.GearInfo;
 import com.wynntils.models.items.WynnItem;
 import com.wynntils.models.items.items.game.GearBoxItem;
 import com.wynntils.utils.render.FontRenderer;
-import com.wynnventory.api.WynnventoryAPI;
 
 import com.wynnventory.model.item.trademarket.TradeMarketItemPriceInfo;
+import com.wynnventory.util.InfoCache;
 import com.wynnventory.util.ItemStackUtils;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -22,70 +22,43 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.*;
 
 
+
 @Mixin(AbstractContainerScreen.class)
 public abstract class AbstractContainerScreenMixin {
 
-    private static final Map<String, Double> priceCache = new HashMap<>();
-    private static final WynnventoryAPI wynnventoryAPI = new WynnventoryAPI();
-    private static final ItemStackUtils itemStackUtils = new ItemStackUtils();
+    private static final Map<String, InfoCache.PriceEntry> priceCache =InfoCache.priceCache;
     private static final double priceStx = 262_144;
     private static final double priceLiquidEmerald = 4_096;
     private static final double priceEmeraldBlock = 64;
-    private static boolean debugMode = true;
 
 
-    private double getItemPrice(ItemStack stack) {
+    private Double getItemPrice(ItemStack stack) {
         if (!Screen.hasAltDown())
-            return 0.0;
+            return null;
 
         Optional<WynnItem> maybeItem = Models.Item.getWynnItem(stack);
         if (maybeItem.isEmpty())
-            return 0.0;
+            return null;
 
         WynnItem item = maybeItem.get();
-
         String cacheKey;
 
-        // ─────────────────────────────
-        // GearBox handling
-        // ─────────────────────────────
         if (item instanceof GearBoxItem gearBoxItem) {
-            String gearboxId = String.valueOf(gearBoxItem.hashCode());
-            cacheKey = "GEARBOX:" + gearboxId;
-
-            if (debugMode) System.out.println("gearboxId = " + gearboxId + " for box: " + cacheKey);
-
-            if (priceCache.containsKey(cacheKey)) {
-                if (debugMode) System.out.println("Fetching cached price for " + cacheKey); // Debug
-                return priceCache.get(cacheKey);
-            }
-
-            if (debugMode) System.out.println("Attempting to fetch highest value in " + cacheKey); // Debug
-            double highestPrice = processItems(maybeItem);
-            priceCache.put(cacheKey, highestPrice);
-            if (debugMode) System.out.println("Fetched price of " + highestPrice + " for " + cacheKey); // Debug
-            return highestPrice;
+            cacheKey = "GEARBOX:" + gearBoxItem.hashCode();
+            return InfoCache.getCachedPriceOrRequest(
+                    cacheKey,
+                    () -> (double) processItems(maybeItem)
+            );
         }
 
-        // ─────────────────────────────
-        // Normal item handling
-        // ─────────────────────────────
         cacheKey = ItemStackUtils.getWynntilsOriginalNameAsString(item);
-
-        if (priceCache.containsKey(cacheKey)) {
-            if (debugMode) System.out.println("Fetching cached price for item: " + cacheKey); // Debug
-            return priceCache.get(cacheKey);
-        }
-
-        if (debugMode) System.out.println("Attempting to fetch price for item: " + cacheKey); // Debug
-        TradeMarketItemPriceInfo info = ItemStackUtils.getInfo(stack);
-        if (info == null)
-            return 0.0;
-
-        double price = info.getUnidentifiedAverage80Price();
-        priceCache.put(cacheKey, price);
-        if (debugMode) System.out.println("Fetched price of " + price + " for item: " + cacheKey); // Debug
-        return price;
+        return InfoCache.getCachedPriceOrRequest(
+                cacheKey,
+                () -> {
+                    TradeMarketItemPriceInfo info = ItemStackUtils.getInfo(stack);
+                    return info == null ? 0.0 : info.getUnidentifiedAverage80Price();
+                }
+        );
     }
 
 
@@ -100,8 +73,8 @@ public abstract class AbstractContainerScreenMixin {
         ItemStack stack = slot.getItem();
         if (stack.isEmpty()) return;
 
-        double price = getItemPrice(stack);
-        if (price <= priceLiquidEmerald) return;
+        Double price = getItemPrice(stack);
+        if (price == null || price <= priceLiquidEmerald) return;
 
         String text = truncate(price);
 
