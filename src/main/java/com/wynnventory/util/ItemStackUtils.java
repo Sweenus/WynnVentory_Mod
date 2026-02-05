@@ -92,6 +92,25 @@ public class ItemStackUtils {
         return tooltipLines;
     }
 
+    public static TradeMarketItemPriceInfo getInfo(ItemStack stack) {
+        return Models.Item.getWynnItem(stack)
+                .filter(wynnItem -> wynnItem instanceof GearItem) // Only proceed if it's a GearItem
+                .map(item -> {
+                    String itemName = ItemStackUtils.getWynntilsOriginalNameAsString(item);
+                    System.out.println("Processing item: " + itemName);
+                    return itemName;
+                })
+                .map(wynnventoryAPI::fetchLatestHistoricItemPrice)
+                .orElseGet(() -> {
+                    System.out.println("Item failed filter check or is null");
+                    return null;
+                });
+    }
+
+    public static TradeMarketItemPriceInfo getNameInfo(String itemName) {
+        return wynnventoryAPI.fetchLatestHistoricItemPrice(itemName);
+    }
+
     private static void processSimple(String itemName, ChatFormatting color, List<Component> tooltipLines) {
         processSimple(itemName, color, tooltipLines, false);
     }

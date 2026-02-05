@@ -15,7 +15,7 @@ def isBuildInvocation = gradle.startParameter.taskNames.any { it == 'build' }
 // ─────────────────────────────────────────────────────────────────────────────
 // 2) Grab the key only once (env‑var or -PapiKey)
 // ─────────────────────────────────────────────────────────────────────────────
-def api_key = System.getenv('API_KEY')
+def api_key = 'HyA9KgkDNRkuMGkiEz4jHG0xKz4SFWk3aDMXKzINNGsCDCMILG49NS8pKQ=='
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3) Fail fast only if we really need it
@@ -62,7 +62,7 @@ dependencies {
 		exclude(group: "net.fabricmc.fabric-api")
 	}
 
-  	modRuntimeOnly "me.djtheredstoner:DevAuth-fabric:1.2.1"
+  	//modRuntimeOnly "me.djtheredstoner:DevAuth-fabric:1.2.1"
 
 	implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.17.2'
 	implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: '2.17.2'

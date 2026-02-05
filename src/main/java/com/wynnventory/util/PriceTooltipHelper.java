@@ -27,6 +27,7 @@ public class PriceTooltipHelper {
 
     private static final NumberFormat NUMBER_FORMAT = NumberFormat.getInstance();
     private static final EmeraldPrice EMERALD_PRICE = new EmeraldPrice();
+    private static final int HIGH_PRICE_THRESHOLD = 5_000;
 
     private PriceTooltipHelper() {}
 
@@ -60,23 +61,33 @@ public class PriceTooltipHelper {
             addPriceLine(tooltipLines, "Max: ",                     priceInfo.getHighestPrice(),                config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getHighestPrice()                : 0);
             addPriceLine(tooltipLines, "Min: ",                     priceInfo.getLowestPrice(),                 config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getLowestPrice()                 : 0);
             addPriceLine(tooltipLines, "Avg: ",                     priceInfo.getAveragePrice(),                config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getAveragePrice()                : 0);
-            addPriceLine(tooltipLines, "Avg 80%: ",                 priceInfo.getAverage80Price(),              config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getAverage80Price()              : 0);
-            addPriceLine(tooltipLines, "Unidentified Avg: ",        priceInfo.getUnidentifiedAveragePrice(),    config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getUnidentifiedAveragePrice()    : 0);
-            addPriceLine(tooltipLines, "Unidentified Avg 80%: ",    priceInfo.getUnidentifiedAverage80Price(),  config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getUnidentifiedAverage80Price()  : 0);
+            addPriceLine(tooltipLines, "Avg: ",                 priceInfo.getAverage80Price(),              config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getAverage80Price()              : 0);
+            addPriceLine(tooltipLines, "? 80Avg: ",        priceInfo.getUnidentifiedAveragePrice(),    config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getUnidentifiedAveragePrice()    : 0);
+            addPriceLine(tooltipLines, "? Avg: ",    priceInfo.getUnidentifiedAverage80Price(),  config.isShowPriceFluctuation(), isPriceInfoValid(historicInfo) ? historicInfo.getUnidentifiedAverage80Price()  : 0);
         }
 
         return tooltipLines;
     }
 
-    public static void addPriceLine(List<Component> tooltipLines, String label, int price, boolean showFluct, int historicPrice) {
+    public static void addPriceLine(
+            List<Component> tooltipLines,
+            String label,
+            int price,
+            boolean showFluct,
+            int historicPrice
+    ) {
         boolean shouldShow = isShouldShow(label);
 
         if (price > 0 && shouldShow) {
             if (showFluct) {
                 float fluctuation = calcPriceDiff(price, historicPrice);
-                tooltipLines.add(formatPriceWithFluctuation(label, price, fluctuation));
+                tooltipLines.add(
+                        formatPriceWithFluctuation(label, price, fluctuation)
+                );
             } else {
-                tooltipLines.add(formatPrice(label, price));
+                tooltipLines.add(
+                        formatPrice(label, price)
+                );
             }
         }
     }
@@ -88,8 +99,8 @@ public class PriceTooltipHelper {
             case "Min: " -> config.isShowMinPrice();
             case "Avg: " -> config.isShowAveragePrice();
             case "Avg 80%: " -> config.isShowAverage80Price();
-            case "Unidentified Avg: " -> config.isShowUnidAveragePrice();
-            case "Unidentified Avg 80%: " -> config.isShowUnidAverage80Price();
+            case "? 80Avg: " -> config.isShowUnidAveragePrice();
+            case "? Avg: " -> config.isShowUnidAverage80Price();
             default -> false;
         };
     }
@@ -97,37 +108,71 @@ public class PriceTooltipHelper {
     public static MutableComponent formatPrice(String label, int price) {
         ConfigManager config = ConfigManager.getInstance();
         EmeraldDisplayOption priceFormat = config.getPriceFormat();
-        MutableComponent priceComponent = Component.literal(label).withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE));
 
-        int color = (config.getColorSettings().isShowColors() &&
-                price >= config.getColorSettings().getColorMinPrice())
-                ? config.getColorSettings().getHighlightColor()
-                : ChatFormatting.GRAY.getColor();
+        MutableComponent priceComponent =
+                Component.literal(label).withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE));
+
+        int color;
+
+        // 🔴 High-price override
+        if (price > HIGH_PRICE_THRESHOLD) {
+            color = ChatFormatting.GREEN.getColor();
+        }
+        // 🟡 Existing config-based highlight
+        else if (config.getColorSettings().isShowColors()
+                && price >= config.getColorSettings().getColorMinPrice()) {
+            color = config.getColorSettings().getHighlightColor();
+        }
+        // ⚪ Default
+        else {
+            color = ChatFormatting.GRAY.getColor();
+        }
 
         if (price > 0) {
-            String formattedPrice = NUMBER_FORMAT.format(price) + EmeraldUnits.EMERALD.getSymbol();
-            String formattedEmeralds = EMERALD_PRICE.getFormattedString(price, false);
+            String formattedPrice =
+                    NUMBER_FORMAT.format(price) + EmeraldUnits.EMERALD.getSymbol();
+            String formattedEmeralds =
+                    EMERALD_PRICE.getFormattedString(price, false);
+
             switch (priceFormat) {
-                case EmeraldDisplayOption.EMERALDS -> priceComponent.append(Component.literal(formattedPrice)
-                        .withStyle(Style.EMPTY.withColor(color)));
-                case EmeraldDisplayOption.FORMATTED -> priceComponent.append(Component.literal(formattedEmeralds)
-                        .withStyle(Style.EMPTY.withColor(color)));
-                default -> priceComponent.append(Component.literal(formattedPrice)
-                                .withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE)))
-                        .append(Component.literal(" (" + formattedEmeralds + ")")
-                                .withStyle(Style.EMPTY.withColor(color)));
+                case EmeraldDisplayOption.EMERALDS ->
+                        priceComponent.append(
+                                Component.literal(formattedPrice)
+                                        .withStyle(Style.EMPTY.withColor(color))
+                        );
+
+                case EmeraldDisplayOption.FORMATTED ->
+                        priceComponent.append(
+                                Component.literal(formattedEmeralds)
+                                        .withStyle(Style.EMPTY.withColor(color))
+                        );
+
+                default ->
+                        priceComponent
+                                .append(Component.literal(formattedPrice)
+                                        .withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE)))
+                                .append(Component.literal(" (" + formattedEmeralds + ")")
+                                        .withStyle(Style.EMPTY.withColor(color)));
             }
         }
+
         return priceComponent;
     }
 
-    public static MutableComponent formatPriceWithFluctuation(String label, int price, float fluctuation) {
+
+
+    public static MutableComponent formatPriceWithFluctuation(
+            String label,
+            int price,
+            float fluctuation
+    ) {
         return price > 0
                 ? formatPrice(label, price)
                 .append(Component.literal(" "))
                 .append(formatPriceFluctuation(fluctuation))
                 : Component.literal("");
     }
+
 
     public static MutableComponent formatText(String text, ChatFormatting color) {
         return Component.literal(text).withStyle(Style.EMPTY.withColor(color));
@@ -218,7 +263,7 @@ public class PriceTooltipHelper {
         int spaceL = mouseX - gap;
 
         // 6) Pick side
-        boolean placeLeft = spaceL >= spaceR;
+        boolean placeLeft = false;
 
         // 7) Available width
         int availableWidth = Math.max(placeLeft ? spaceL : spaceR, 0);

@@ -3,7 +3,8 @@
     "AbstractContainerScreenAccessor",
     "ClientPacketListenerMixin",
     "MinecraftMixin",
-    "TooltipMixin"
+    "TooltipMixin",
+    "AbstractContainerScreenMixin"
   ],
   "compatibilityLevel": "JAVA_21",
   "injectors": {
